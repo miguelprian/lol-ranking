@@ -108,8 +108,10 @@ export default function Home() {
   const iconUrl = (id: number, version: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${id}.png`
 
-  const emblemUrl = (tier: string) =>
-    `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tier.toLowerCase()}.png`
+  const emblemUrl = (tier: string) => {
+    const ext = tier === 'EMERALD' ? 'svg' : 'png'
+    return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tier.toLowerCase()}.${ext}`
+  }
 
   const opggUrl = (gameName: string, tagLine: string) =>
     `https://www.op.gg/summoners/euw/${encodeURIComponent(gameName)}-${encodeURIComponent(tagLine)}`
