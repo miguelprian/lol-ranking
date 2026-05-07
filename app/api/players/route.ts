@@ -72,7 +72,7 @@ async function getPlayerData(player: PlayerInput, apiKey: string): Promise<Playe
     const summoner = await summonerRes.json()
 
     const rankedRes = await fetch(
-      `https://euw1.api.riotgames.com/lol/league/v4/entries/by-summoner/${summoner.id}`,
+      `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
       { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
     )
     const ranked: any[] = rankedRes.ok ? await rankedRes.json() : []
