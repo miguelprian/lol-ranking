@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { RecentMatchesFeed } from './components/RecentMatchesFeed'
 import {
   LineChart,
   Line,
@@ -402,6 +403,9 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Recent matches feed */}
+        <RecentMatchesFeed />
 
         {/* Footer */}
         {data && (
