@@ -36,6 +36,7 @@ const PLAYERS: PlayerInput[] = [
   { gameName: 'EL BICHARRACO', tagLine: 'CR7' },
   { gameName: 'EL PELUCA', tagLine: '232' },
   { gameName: 'QUE СОМА РΕLО', tagLine: 'LEWI' },
+  { gameName: 'rësılıencë', tagLine: 'EUW' },
 ]
 
 const TIER_ORDER = [
