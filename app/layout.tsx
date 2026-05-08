@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Unemployed Ranking de los Chavales',
+  title: 'UNEMPLOYED RANKING',
   description: 'Ranking de Solo/Duo Queue del grupo',
 }
 
