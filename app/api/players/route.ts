@@ -14,13 +14,18 @@ interface RankData {
   winrate: number
 }
 
+interface MatchResult {
+  win: boolean
+  champion: string
+}
+
 interface PlayerResult {
   gameName: string
   tagLine: string
   profileIconId: number
   summonerLevel: number
   rank: RankData | null
-  recentMatches: boolean[] | null
+  recentMatches: MatchResult[] | null
   error: string | null
 }
 
@@ -51,7 +56,7 @@ async function getDDragonVersion(): Promise<string> {
   }
 }
 
-async function getMatchHistory(puuid: string, apiKey: string): Promise<boolean[]> {
+async function getMatchHistory(puuid: string, apiKey: string): Promise<MatchResult[]> {
   try {
     const idsRes = await fetch(
       `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&count=20`,
@@ -70,14 +75,15 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<boolean[]
           if (!matchRes.ok) return null
           const match = await matchRes.json()
           const participant = match.info.participants.find((p: any) => p.puuid === puuid)
-          return participant?.win ?? null
+          if (!participant) return null
+          return { win: participant.win as boolean, champion: participant.championName as string }
         } catch {
           return null
         }
       })
     )
 
-    return results.filter((r): r is boolean => r !== null)
+    return results.filter((r): r is MatchResult => r !== null)
   } catch {
     return []
   }

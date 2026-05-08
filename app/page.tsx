@@ -20,13 +20,18 @@ interface RankData {
   winrate: number
 }
 
+interface MatchResult {
+  win: boolean
+  champion: string
+}
+
 interface Player {
   gameName: string
   tagLine: string
   profileIconId: number
   summonerLevel: number
   rank: RankData | null
-  recentMatches: boolean[] | null
+  recentMatches: MatchResult[] | null
   error: string | null
 }
 
@@ -85,7 +90,7 @@ function buildChartData(players: Player[]) {
       if (!p.recentMatches || p.recentMatches.length === 0) return
       const chronological = [...p.recentMatches].reverse()
       const slice = chronological.slice(0, gameIdx + 1)
-      point[p.gameName] = slice.reduce((sum, win) => sum + (win ? 1 : -1), 0)
+      point[p.gameName] = slice.reduce((sum, m) => sum + (m.win ? 1 : -1), 0)
     })
     return point
   })
@@ -283,17 +288,33 @@ export default function Home() {
 
                       {/* Last 5 matches */}
                       {player.recentMatches && player.recentMatches.length > 0 && (
-                        <div className="flex gap-1 mt-1.5">
-                          {player.recentMatches.slice(0, 5).map((win, idx) => (
-                            <div
-                              key={idx}
-                              className={`w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold ${
-                                win
-                                  ? 'bg-blue-600/80 text-blue-100'
-                                  : 'bg-red-700/80 text-red-100'
-                              }`}
-                            >
-                              {win ? 'V' : 'D'}
+                        <div className="flex gap-1.5 mt-2">
+                          {player.recentMatches.slice(0, 5).map((match, idx) => (
+                            <div key={idx} className="relative group shrink-0">
+                              <img
+                                src={`https://ddragon.leagueoflegends.com/cdn/${data.ddVersion}/img/champion/${match.champion}.png`}
+                                alt={match.champion}
+                                title={match.champion}
+                                width={34}
+                                height={34}
+                                className={`w-[34px] h-[34px] rounded-md object-cover border-2 transition-opacity group-hover:opacity-90 ${
+                                  match.win
+                                    ? 'border-blue-500/70'
+                                    : 'border-red-600/60'
+                                }`}
+                                onError={(e) => {
+                                  ;(e.target as HTMLImageElement).style.opacity = '0.2'
+                                }}
+                              />
+                              <span
+                                className={`absolute -bottom-1 -right-1 text-[7px] font-black leading-none px-[3px] py-[2px] rounded-sm ${
+                                  match.win
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-red-700 text-white'
+                                }`}
+                              >
+                                {match.win ? 'V' : 'D'}
+                              </span>
                             </div>
                           ))}
                         </div>
