@@ -1,6 +1,15 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts'
 
 interface RankData {
   tier: string
@@ -17,6 +26,7 @@ interface Player {
   profileIconId: number
   summonerLevel: number
   rank: RankData | null
+  recentMatches: boolean[] | null
   error: string | null
 }
 
@@ -38,6 +48,8 @@ const TIER_COLORS: Record<string, string> = {
   GRANDMASTER: '#f87171',
   CHALLENGER: '#fbbf24',
 }
+
+const CHART_COLORS = ['#818cf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#38bdf8']
 
 const APEX_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER'])
 
@@ -61,6 +73,22 @@ function getCardStyle(index: number): React.CSSProperties {
     }
   }
   return {}
+}
+
+function buildChartData(players: Player[]) {
+  const maxLen = Math.max(...players.map((p) => p.recentMatches?.length ?? 0))
+  if (maxLen === 0) return []
+
+  return Array.from({ length: maxLen }, (_, gameIdx) => {
+    const point: Record<string, number | string> = { game: gameIdx + 1 }
+    players.forEach((p) => {
+      if (!p.recentMatches || p.recentMatches.length === 0) return
+      const chronological = [...p.recentMatches].reverse()
+      const slice = chronological.slice(0, gameIdx + 1)
+      point[p.gameName] = slice.reduce((sum, win) => sum + (win ? 1 : -1), 0)
+    })
+    return point
+  })
 }
 
 export default function Home() {
@@ -115,6 +143,9 @@ export default function Home() {
 
   const opggUrl = (gameName: string, tagLine: string) =>
     `https://www.op.gg/summoners/euw/${encodeURIComponent(gameName)}-${encodeURIComponent(tagLine)}`
+
+  const chartData = data ? buildChartData(data.players) : []
+  const playersWithMatches = data?.players.filter((p) => p.recentMatches && p.recentMatches.length > 0) ?? []
 
   return (
     <main className="min-h-screen bg-[#060d1a] py-10 px-4">
@@ -249,6 +280,24 @@ export default function Home() {
                       ) : (
                         <p className="text-[#1e2d45] text-xs mt-0.5">Sin clasificar</p>
                       )}
+
+                      {/* Last 5 matches */}
+                      {player.recentMatches && player.recentMatches.length > 0 && (
+                        <div className="flex gap-1 mt-1.5">
+                          {player.recentMatches.slice(0, 5).map((win, idx) => (
+                            <div
+                              key={idx}
+                              className={`w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold ${
+                                win
+                                  ? 'bg-blue-600/80 text-blue-100'
+                                  : 'bg-red-700/80 text-red-100'
+                              }`}
+                            >
+                              {win ? 'V' : 'D'}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Op.gg button */}
@@ -264,6 +313,74 @@ export default function Home() {
                 </div>
               ))}
         </div>
+
+        {/* Chart */}
+        {chartData.length > 0 && playersWithMatches.length > 0 && (
+          <div className="mt-8 bg-[#0c1525] rounded-xl border border-[#111d30] p-5">
+            <h2 className="text-white text-sm font-bold tracking-widest uppercase mb-1">
+              Forma reciente
+            </h2>
+            <p className="text-[#334155] text-xs mb-5">
+              Últimas {chartData.length} partidas ranked · +1 victoria / −1 derrota
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <XAxis
+                  dataKey="game"
+                  tick={{ fill: '#1e2d45', fontSize: 10 }}
+                  axisLine={{ stroke: '#111d30' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: '#1e2d45', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <ReferenceLine y={0} stroke="#1e2d45" strokeDasharray="3 3" />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0a1020',
+                    border: '1px solid #161e30',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: '#e2e8f0',
+                  }}
+                  itemStyle={{ color: '#94a3b8' }}
+                  labelFormatter={(v) => `Partida ${v}`}
+                  formatter={(value, name) => [
+                    typeof value === 'number' && value > 0 ? `+${value}` : value,
+                    name as string,
+                  ]}
+                />
+                {playersWithMatches.map((player, idx) => (
+                  <Line
+                    key={player.gameName}
+                    type="monotone"
+                    dataKey={player.gameName}
+                    stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0 }}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4">
+              {playersWithMatches.map((player, idx) => (
+                <div key={player.gameName} className="flex items-center gap-1.5">
+                  <div
+                    className="w-3 h-0.5 rounded-full"
+                    style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                  />
+                  <span className="text-[#475569] text-xs">{player.gameName}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         {data && (

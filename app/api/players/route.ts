@@ -20,6 +20,7 @@ interface PlayerResult {
   profileIconId: number
   summonerLevel: number
   rank: RankData | null
+  recentMatches: boolean[] | null
   error: string | null
 }
 
@@ -50,10 +51,42 @@ async function getDDragonVersion(): Promise<string> {
   }
 }
 
+async function getMatchHistory(puuid: string, apiKey: string): Promise<boolean[]> {
+  try {
+    const idsRes = await fetch(
+      `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&count=20`,
+      { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
+    )
+    if (!idsRes.ok) return []
+    const matchIds: string[] = await idsRes.json()
+
+    const results = await Promise.all(
+      matchIds.map(async (matchId) => {
+        try {
+          const matchRes = await fetch(
+            `https://europe.api.riotgames.com/lol/match/v5/matches/${matchId}`,
+            { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 86400 } }
+          )
+          if (!matchRes.ok) return null
+          const match = await matchRes.json()
+          const participant = match.info.participants.find((p: any) => p.puuid === puuid)
+          return participant?.win ?? null
+        } catch {
+          return null
+        }
+      })
+    )
+
+    return results.filter((r): r is boolean => r !== null)
+  } catch {
+    return []
+  }
+}
+
 async function getPlayerData(player: PlayerInput, apiKey: string): Promise<PlayerResult> {
   const { gameName, tagLine } = player
   const fallback = (error: string): PlayerResult => ({
-    gameName, tagLine, profileIconId: 29, summonerLevel: 0, rank: null, error,
+    gameName, tagLine, profileIconId: 29, summonerLevel: 0, rank: null, recentMatches: null, error,
   })
 
   try {
@@ -64,17 +97,21 @@ async function getPlayerData(player: PlayerInput, apiKey: string): Promise<Playe
     if (!accountRes.ok) return fallback('Cuenta no encontrada')
     const account = await accountRes.json()
 
-    const summonerRes = await fetch(
-      `https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`,
-      { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
-    )
+    const [summonerRes, rankedRes, recentMatches] = await Promise.all([
+      fetch(
+        `https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`,
+        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
+      ),
+      fetch(
+        `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
+        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
+      ),
+      getMatchHistory(account.puuid, apiKey),
+    ])
+
     if (!summonerRes.ok) return fallback('Invocador no encontrado')
     const summoner = await summonerRes.json()
 
-    const rankedRes = await fetch(
-      `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
-      { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
-    )
     const ranked: any[] = rankedRes.ok ? await rankedRes.json() : []
     const solo = ranked.find((e) => e.queueType === 'RANKED_SOLO_5x5')
 
@@ -93,6 +130,7 @@ async function getPlayerData(player: PlayerInput, apiKey: string): Promise<Playe
             winrate: Math.round((solo.wins / (solo.wins + solo.losses)) * 100),
           }
         : null,
+      recentMatches,
       error: null,
     }
   } catch {
