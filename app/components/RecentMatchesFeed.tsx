@@ -217,111 +217,132 @@ function MatchCard({
   const redKills = red.reduce((s, p) => s + p.kills, 0)
   const trackedInMatch = match.participants.filter((p) => trackedPlayers[p.puuid])
 
+  // Win/loss desde la perspectiva del grupo
+  const groupWon = trackedInMatch.length > 0 ? trackedInMatch[0].win : blueWon
+
   return (
-    <div className="bg-[#0c1525] rounded-xl border border-[#111d30] overflow-hidden hover:border-[#1a2a40] transition-colors">
+    <div
+      className={`bg-[#0c1525] rounded-xl overflow-hidden border transition-colors
+        ${groupWon
+          ? 'border-blue-900/50 border-l-[3px] border-l-blue-500/70 hover:border-blue-800/60'
+          : 'border-red-900/40 border-l-[3px] border-l-red-600/60 hover:border-red-800/50'
+        }`}
+    >
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full text-left px-4 py-3 hover:bg-[#0f1e35] transition-colors"
       >
-        {/* Meta row */}
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="text-[#4f46e5] text-xs font-semibold">Ranked Solo</span>
+        {/* Meta row: badge V/D + info */}
+        <div className="flex items-center gap-2 mb-3">
+          <span
+            className={`text-[11px] font-black px-2 py-0.5 rounded tracking-wider ${
+              groupWon
+                ? 'bg-blue-600/20 text-blue-300 border border-blue-600/30'
+                : 'bg-red-700/20 text-red-400 border border-red-700/30'
+            }`}
+          >
+            {groupWon ? 'VICTORIA' : 'DERROTA'}
+          </span>
+          <span className="text-[#334155] text-xs">{formatDuration(match.gameDuration)}</span>
           <span className="text-[#1e2d45] text-xs">·</span>
-          <span className="text-[#475569] text-xs">{formatDuration(match.gameDuration)}</span>
-          <span className="text-[#1e2d45] text-xs">·</span>
-          <span className="text-[#334155] text-xs">hace {timeAgo(match.gameStartTimestamp)}</span>
+          <span className="text-[#283548] text-xs">hace {timeAgo(match.gameStartTimestamp)}</span>
           <span className="ml-auto text-[#1e2d45] text-xs select-none">
             {expanded ? '▲' : '▼'}
           </span>
         </div>
 
-        {/* 5v5 champion icons + score */}
+        {/* Tracked players — protagonistas de la card */}
+        {trackedInMatch.length > 0 && (
+          <div className="flex flex-wrap gap-3 mb-3">
+            {trackedInMatch.map((p) => (
+              <div key={p.puuid} className="flex items-center gap-2">
+                <div className="relative shrink-0">
+                  <img
+                    src={`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${p.championName}.png`}
+                    alt={p.championName}
+                    width={36}
+                    height={36}
+                    className={`w-9 h-9 rounded-lg object-cover border-2 ${
+                      p.win ? 'border-blue-500/70' : 'border-red-600/60'
+                    }`}
+                    onError={(e) => {
+                      ;(e.target as HTMLImageElement).style.opacity = '0.2'
+                    }}
+                  />
+                  <span className="absolute -bottom-1 -right-1 text-[8px] bg-black/80 text-[#94a3b8] px-[3px] py-[1px] rounded-sm leading-none">
+                    {p.champLevel}
+                  </span>
+                </div>
+                <div className="leading-tight">
+                  <div className={`text-sm font-bold ${p.win ? 'text-blue-200' : 'text-red-300'}`}>
+                    {trackedPlayers[p.puuid]}
+                  </div>
+                  <div className="text-[11px] text-[#475569]">
+                    <span className="text-green-400/80">{p.kills}</span>
+                    <span className="text-[#283548]">/</span>
+                    <span className="text-red-400/80">{p.deaths}</span>
+                    <span className="text-[#283548]">/</span>
+                    <span className="text-[#64748b]">{p.assists}</span>
+                    <span className="text-[#334155] ml-1.5">{p.championName}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 5v5 grid + marcador (contexto secundario) */}
         <div className="flex items-center gap-2">
-          {/* Blue side */}
-          <div className={`flex gap-1 ${blueWon ? '' : 'opacity-40'}`}>
+          <div className={`flex gap-0.5 ${blueWon ? '' : 'opacity-35'}`}>
             {blue.map((p) => (
               <div key={p.puuid} className="relative">
                 <img
                   src={`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${p.championName}.png`}
                   alt={p.championName}
                   title={trackedPlayers[p.puuid] ?? p.championName}
-                  width={28}
-                  height={28}
-                  className={`w-7 h-7 rounded object-cover border ${
-                    blueWon ? 'border-blue-600/60' : 'border-[#1e2d45]'
+                  width={24}
+                  height={24}
+                  className={`w-6 h-6 rounded object-cover border ${
+                    trackedPlayers[p.puuid] ? 'border-[#4f46e5]/70' : 'border-[#111d30]'
                   }`}
                   onError={(e) => {
                     ;(e.target as HTMLImageElement).style.opacity = '0.2'
                   }}
                 />
-                {trackedPlayers[p.puuid] && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#4f46e5] border border-[#060d1a]" />
-                )}
               </div>
             ))}
           </div>
 
-          {/* Score */}
-          <div className="flex items-center gap-1.5 shrink-0 px-1">
-            <span
-              className={`text-sm font-black tabular-nums ${
-                blueWon ? 'text-blue-400' : 'text-[#334155]'
-              }`}
-            >
+          <div className="flex items-center gap-1.5 shrink-0 px-1.5">
+            <span className={`text-sm font-black tabular-nums ${blueWon ? 'text-blue-400' : 'text-[#283548]'}`}>
               {blueKills}
             </span>
-            <span className="text-[#1e2d45] text-xs font-medium">—</span>
-            <span
-              className={`text-sm font-black tabular-nums ${
-                !blueWon ? 'text-red-400' : 'text-[#334155]'
-              }`}
-            >
+            <span className="text-[#1e2d45] text-xs">—</span>
+            <span className={`text-sm font-black tabular-nums ${!blueWon ? 'text-red-400' : 'text-[#283548]'}`}>
               {redKills}
             </span>
           </div>
 
-          {/* Red side */}
-          <div className={`flex gap-1 ${!blueWon ? '' : 'opacity-40'}`}>
+          <div className={`flex gap-0.5 ${!blueWon ? '' : 'opacity-35'}`}>
             {red.map((p) => (
               <div key={p.puuid} className="relative">
                 <img
                   src={`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${p.championName}.png`}
                   alt={p.championName}
                   title={trackedPlayers[p.puuid] ?? p.championName}
-                  width={28}
-                  height={28}
-                  className={`w-7 h-7 rounded object-cover border ${
-                    !blueWon ? 'border-red-600/60' : 'border-[#1e2d45]'
+                  width={24}
+                  height={24}
+                  className={`w-6 h-6 rounded object-cover border ${
+                    trackedPlayers[p.puuid] ? 'border-[#4f46e5]/70' : 'border-[#111d30]'
                   }`}
                   onError={(e) => {
                     ;(e.target as HTMLImageElement).style.opacity = '0.2'
                   }}
                 />
-                {trackedPlayers[p.puuid] && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#4f46e5] border border-[#060d1a]" />
-                )}
               </div>
             ))}
           </div>
         </div>
-
-        {/* Tracked players summary */}
-        {trackedInMatch.length > 0 && (
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
-            {trackedInMatch.map((p) => (
-              <span
-                key={p.puuid}
-                className={`text-xs ${p.win ? 'text-blue-400/70' : 'text-red-400/60'}`}
-              >
-                {trackedPlayers[p.puuid]}
-                <span className="text-[#334155]"> · {p.championName}</span>
-                <span className={`ml-1 ${p.win ? 'text-blue-500/60' : 'text-red-500/60'}`}>
-                  {p.kills}/{p.deaths}/{p.assists}
-                </span>
-              </span>
-            ))}
-          </div>
-        )}
       </button>
 
       {/* Expanded detail */}
@@ -373,7 +394,7 @@ export function RecentMatchesFeed() {
         Historial Reciente
       </h2>
       <p className="text-[#334155] text-xs mb-4">
-        Últimas 20 partidas ranked del grupo · punto azul = miembro del grupo
+        Últimas 20 partidas ranked del grupo
       </p>
 
       {loading ? (
