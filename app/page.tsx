@@ -160,7 +160,7 @@ export default function Home() {
         {/* Header */}
         <header className="text-center mb-8">
           <h1 className="text-2xl font-black text-white tracking-widest uppercase">
-            EUW Gang Ranking
+            Unemployed Ranking de los Chavales
           </h1>
           <p className="text-[#334155] text-xs mt-1 tracking-widest uppercase">
             Solo / Duo Queue
