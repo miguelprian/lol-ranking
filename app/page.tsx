@@ -343,47 +343,82 @@ export default function Home() {
                         </a>
                       </div>
 
-                      {/* ─ Bottom row: champion + last 5 ─ */}
+                      {/* ─ Bottom area: most played champ + last 5 ─ */}
                       {(topChamp || player.recentMatches?.length) && (
-                        <div className="mt-4 flex items-center gap-3 flex-wrap pl-[54px]">
+                        <div className="mt-4 pl-[54px] flex items-start gap-4 flex-wrap">
+
+                          {/* Most played champion card */}
                           {topChamp && (
-                            <div className="flex items-center gap-2 bg-[#090e1a] rounded-lg px-2.5 py-1.5 border border-[#0f1a2e]">
-                              <img
-                                src={champUrl(topChamp.champion, data.ddVersion)} alt={topChamp.champion}
-                                width={22} height={22}
-                                className="w-[22px] h-[22px] rounded-md object-cover"
-                                onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
-                              />
-                              <span className="text-[#64748b] text-xs font-semibold">{topChamp.champion}</span>
-                              <span className="text-[#1e2d45] text-xs">·</span>
-                              <span className="text-[#475569] text-xs">{topChamp.games}p</span>
-                              <span className="text-[#1e2d45] text-xs">·</span>
-                              <span className={`text-xs font-bold ${topChamp.wr >= 50 ? 'text-emerald-500/80' : 'text-red-400/80'}`}>
-                                {topChamp.wr}% WR
-                              </span>
+                            <div className="flex-1 min-w-[190px] max-w-[260px]">
+                              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-400/60 mb-1.5">
+                                ✦ Most Played Champ
+                              </p>
+                              <div
+                                className="relative overflow-hidden rounded-xl border border-indigo-500/20"
+                                style={{ boxShadow: '0 0 18px rgba(79,70,229,0.15), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                              >
+                                {/* Splash art background */}
+                                <img
+                                  src={`https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${topChamp.champion}_0.jpg`}
+                                  alt=""
+                                  className="absolute right-0 top-0 h-full w-28 object-cover object-[center_top] opacity-25 pointer-events-none select-none"
+                                  onError={(e) => { ;(e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                                {/* Dark gradient over splash */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#080d1c] via-[#080d1c]/80 to-transparent" />
+                                {/* Subtle top glow */}
+                                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-indigo-500/40 via-indigo-400/20 to-transparent" />
+
+                                {/* Content */}
+                                <div className="relative flex items-center gap-2.5 px-3 py-2.5">
+                                  <img
+                                    src={champUrl(topChamp.champion, data.ddVersion)}
+                                    alt={topChamp.champion}
+                                    width={36} height={36}
+                                    className="w-9 h-9 rounded-lg object-cover border border-indigo-500/30 shadow-md shadow-indigo-950/60 shrink-0"
+                                    onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-white text-sm font-bold leading-tight truncate">{topChamp.champion}</p>
+                                    <p className="text-indigo-300/50 text-[11px] mt-0.5">{topChamp.games} partidas</p>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className={`text-xl font-black leading-none ${topChamp.wr >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                      {topChamp.wr}%
+                                    </p>
+                                    <p className="text-[#334155] text-[9px] mt-0.5 uppercase tracking-wide">WR</p>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           )}
 
+                          {/* Last 5 matches */}
                           {player.recentMatches && player.recentMatches.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              {player.recentMatches.slice(0, 5).map((match, idx) => (
-                                <div key={idx} className="relative group/img shrink-0">
-                                  <img
-                                    src={champUrl(match.champion, data.ddVersion)}
-                                    alt={match.champion} title={match.champion}
-                                    width={34} height={34}
-                                    className={`w-[34px] h-[34px] rounded-lg object-cover border-2 transition-opacity group-hover/img:brightness-110 ${
-                                      match.win ? 'border-blue-500/70' : 'border-red-600/60'
-                                    }`}
-                                    onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
-                                  />
-                                  <span className={`absolute -bottom-1 -right-1 text-[7px] font-black leading-none px-[3px] py-[2px] rounded-sm ${
-                                    match.win ? 'bg-blue-600 text-white' : 'bg-red-700 text-white'
-                                  }`}>
-                                    {match.win ? 'V' : 'D'}
-                                  </span>
-                                </div>
-                              ))}
+                            <div>
+                              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#1e2d45] mb-1.5">
+                                Últimas 5
+                              </p>
+                              <div className="flex gap-1.5">
+                                {player.recentMatches.slice(0, 5).map((match, idx) => (
+                                  <div key={idx} className="relative group/img shrink-0">
+                                    <img
+                                      src={champUrl(match.champion, data.ddVersion)}
+                                      alt={match.champion} title={match.champion}
+                                      width={34} height={34}
+                                      className={`w-[34px] h-[34px] rounded-lg object-cover border-2 group-hover/img:brightness-110 transition-all ${
+                                        match.win ? 'border-blue-500/70' : 'border-red-600/60'
+                                      }`}
+                                      onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
+                                    />
+                                    <span className={`absolute -bottom-1 -right-1 text-[7px] font-black leading-none px-[3px] py-[2px] rounded-sm ${
+                                      match.win ? 'bg-blue-600 text-white' : 'bg-red-700 text-white'
+                                    }`}>
+                                      {match.win ? 'V' : 'D'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

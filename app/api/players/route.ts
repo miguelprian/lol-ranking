@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+// Cache the full route response for 30 minutes
+export const revalidate = 1800
+
 interface PlayerInput { gameName: string; tagLine: string }
 
 interface RankData {
@@ -9,7 +12,9 @@ interface RankData {
 
 interface MatchResult { win: boolean; champion: string }
 
-export interface ChampionStat { champion: string; games: number; wins: number; wr: number }
+export interface ChampionStat {
+  champion: string; games: number; wins: number; wr: number
+}
 
 interface PlayerResult {
   gameName: string; tagLine: string
@@ -31,7 +36,11 @@ const PLAYERS: PlayerInput[] = [
 ]
 
 const TIER_ORDER = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER']
-const DIV_ORDER = ['IV','III','II','I']
+const DIV_ORDER  = ['IV','III','II','I']
+
+// Season 2025 Split 1 start — Jan 9 2025 00:00 UTC (epoch seconds)
+const SEASON_2025_START = 1736380800
+
 const CHAMPION_OVERRIDES: Record<string, string> = { FiddleSticks: 'Fiddlesticks' }
 const fixChamp = (name: string) => CHAMPION_OVERRIDES[name] ?? name
 
@@ -45,28 +54,52 @@ async function getDDragonVersion(): Promise<string> {
   } catch { return '15.8.1' }
 }
 
+/**
+ * Fetches ALL ranked solo/duo match IDs since the start of Season 2025,
+ * paginating 100 at a time.  Capped at 600 games to avoid runaway loops.
+ */
+async function getAllSeasonMatchIds(puuid: string, apiKey: string): Promise<string[]> {
+  const allIds: string[] = []
+  const PAGE_SIZE = 100
+  const MAX_PAGES = 6 // 600 games max — covers even the most active players
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const url =
+      `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
+      `?queue=420&count=${PAGE_SIZE}&start=${page * PAGE_SIZE}&startTime=${SEASON_2025_START}`
+
+    const res = await fetch(url, {
+      headers: { 'X-Riot-Token': apiKey },
+      next: { revalidate: 1800 },
+    })
+    if (!res.ok) break
+
+    const ids: string[] = await res.json()
+    allIds.push(...ids)
+    if (ids.length < PAGE_SIZE) break // no more pages
+  }
+
+  return allIds
+}
+
 async function getMatchHistory(puuid: string, apiKey: string): Promise<{
   recentMatches: MatchResult[]
   topChampion: ChampionStat | null
 }> {
   try {
-    // Fetch last 50 ranked solo/duo matches for season-level champion stats
-    const idsRes = await fetch(
-      `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&count=50`,
-      { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
-    )
-    if (!idsRes.ok) return { recentMatches: [], topChampion: null }
-    const matchIds: string[] = await idsRes.json()
+    const allIds = await getAllSeasonMatchIds(puuid, apiKey)
+    if (!allIds.length) return { recentMatches: [], topChampion: null }
 
+    // Fetch all match details in parallel (24h cache — shared across players & routes)
     const results = await Promise.all(
-      matchIds.map(async (matchId) => {
+      allIds.map(async (matchId) => {
         try {
-          const matchRes = await fetch(
+          const res = await fetch(
             `https://europe.api.riotgames.com/lol/match/v5/matches/${matchId}`,
             { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 86400 } }
           )
-          if (!matchRes.ok) return null
-          const match = await matchRes.json()
+          if (!res.ok) return null
+          const match = await res.json()
           const p = match.info.participants.find((x: { puuid: string }) => x.puuid === puuid)
           if (!p) return null
           return { win: p.win as boolean, champion: fixChamp(p.championName as string) }
@@ -76,7 +109,7 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<{
 
     const allMatches = results.filter((r): r is MatchResult => r !== null)
 
-    // Compute per-champion stats across all fetched matches (season coverage)
+    // Compute per-champion stats for the full season
     const champMap: Record<string, { games: number; wins: number }> = {}
     for (const m of allMatches) {
       if (!champMap[m.champion]) champMap[m.champion] = { games: 0, wins: 0 }
@@ -84,15 +117,16 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<{
       if (m.win) champMap[m.champion].wins++
     }
 
-    const topChampion = Object.entries(champMap)
-      .sort((a, b) => b[1].games - a[1].games)
-      .map(([champion, s]) => ({
-        champion, games: s.games, wins: s.wins,
-        wr: Math.round((s.wins / s.games) * 100),
-      }))[0] ?? null
+    const topChampion =
+      Object.entries(champMap)
+        .sort((a, b) => b[1].games - a[1].games)
+        .map(([champion, s]) => ({
+          champion, games: s.games, wins: s.wins,
+          wr: Math.round((s.wins / s.games) * 100),
+        }))[0] ?? null
 
     return {
-      recentMatches: allMatches.slice(0, 20),
+      recentMatches: allMatches.slice(0, 20), // last 20 for the icons row
       topChampion,
     }
   } catch { return { recentMatches: [], topChampion: null } }
@@ -107,24 +141,31 @@ async function getPlayerData(player: PlayerInput, apiKey: string): Promise<Playe
 
   try {
     const accountRes = await fetch(
-      `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+      `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/` +
+      `${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
       { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
     )
     if (!accountRes.ok) return fallback('Cuenta no encontrada')
     const account = await accountRes.json()
 
     const [summonerRes, rankedRes, matchData] = await Promise.all([
-      fetch(`https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`,
-        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }),
-      fetch(`https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
-        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }),
+      fetch(
+        `https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`,
+        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
+      ),
+      fetch(
+        `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
+        { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: 300 } }
+      ),
       getMatchHistory(account.puuid, apiKey),
     ])
 
     if (!summonerRes.ok) return fallback('Invocador no encontrado')
     const summoner = await summonerRes.json()
-    const ranked: { queueType: string; tier: string; rank: string; leaguePoints: number; wins: number; losses: number }[] =
-      rankedRes.ok ? await rankedRes.json() : []
+    const ranked: {
+      queueType: string; tier: string; rank: string
+      leaguePoints: number; wins: number; losses: number
+    }[] = rankedRes.ok ? await rankedRes.json() : []
     const solo = ranked.find((e) => e.queueType === 'RANKED_SOLO_5x5')
 
     return {
@@ -158,7 +199,8 @@ function sortPlayers(players: PlayerResult[]): PlayerResult[] {
 
 export async function GET() {
   const apiKey = process.env.RIOT_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'RIOT_API_KEY no configurada' }, { status: 500 })
+  if (!apiKey)
+    return NextResponse.json({ error: 'RIOT_API_KEY no configurada' }, { status: 500 })
 
   const [players, ddVersion] = await Promise.all([
     Promise.all(PLAYERS.map((p) => getPlayerData(p, apiKey))),
