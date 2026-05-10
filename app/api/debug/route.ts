@@ -5,31 +5,38 @@ export async function GET(req: NextRequest) {
   const apiKey = process.env.RIOT_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'no key' }, { status: 500 })
   const puuid = req.nextUrl.searchParams.get('puuid') ?? ''
-
-  const base = `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids`
   const h = { 'X-Riot-Token': apiKey }
+  const base = `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids`
 
-  const [all, q420, q440, typeRanked] = await Promise.all([
-    fetch(`${base}?count=100&start=0`, { headers: h }).then(r => r.json()),
-    fetch(`${base}?queue=420&count=100&start=0`, { headers: h }).then(r => r.json()),
-    fetch(`${base}?queue=440&count=100&start=0`, { headers: h }).then(r => r.json()),
-    fetch(`${base}?type=ranked&count=100&start=0`, { headers: h }).then(r => r.json()),
-  ])
+  // Count total q420 games by paginating until empty
+  let total = 0
+  const pageSizes: number[] = []
+  for (let p = 0; p < 10; p++) {
+    const r = await fetch(`${base}?queue=420&count=100&start=${p * 100}`, { headers: h })
+    if (!r.ok) break
+    const ids: string[] = await r.json()
+    pageSizes.push(ids.length)
+    total += ids.length
+    if (ids.length < 100) break
+  }
 
-  // Also get page 2 for queue=420
-  const q420p2 = await fetch(`${base}?queue=420&count=100&start=100`, { headers: h }).then(r => r.json())
-  // And page 3
-  const q420p3 = await fetch(`${base}?queue=420&count=100&start=200`, { headers: h }).then(r => r.json())
-  // type=ranked page 2
-  const typeRankedP2 = await fetch(`${base}?type=ranked&count=100&start=100`, { headers: h }).then(r => r.json())
+  // Get timestamp of match at position 0, 100, 200 to find season boundary
+  const checkPositions = [0, 100, 200, 300]
+  const timestamps: Record<number, string> = {}
+  for (const pos of checkPositions) {
+    const r = await fetch(`${base}?queue=420&count=1&start=${pos}`, { headers: h })
+    if (!r.ok) break
+    const ids: string[] = await r.json()
+    if (!ids.length) break
+    const matchRes = await fetch(
+      `https://europe.api.riotgames.com/lol/match/v5/matches/${ids[0]}`,
+      { headers: h }
+    )
+    if (!matchRes.ok) break
+    const match = await matchRes.json()
+    const ts = match.info.gameStartTimestamp as number
+    timestamps[pos] = new Date(ts).toISOString().slice(0, 10)
+  }
 
-  return NextResponse.json({
-    all_page1: Array.isArray(all) ? all.length : all,
-    q420_page1: Array.isArray(q420) ? q420.length : q420,
-    q420_page2: Array.isArray(q420p2) ? q420p2.length : q420p2,
-    q420_page3: Array.isArray(q420p3) ? q420p3.length : q420p3,
-    q440_page1: Array.isArray(q440) ? q440.length : q440,
-    type_ranked_page1: Array.isArray(typeRanked) ? typeRanked.length : typeRanked,
-    type_ranked_page2: Array.isArray(typeRankedP2) ? typeRankedP2.length : typeRankedP2,
-  })
+  return NextResponse.json({ total, pageSizes, dateAtPosition: timestamps })
 }
