@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 
-// ISR: 5-min cache, cleared on every deployment.
-// Only fetches rank data + last 20 match icons per player — fast,
-// no batching delays, well within build-time limits.
-// Season champion stats are fetched lazily per-player via /api/champ/[puuid].
-export const revalidate = 300
+// Dynamic: runs at request time so RIOT_API_KEY is available.
+// Individual fetches use Next.js Data Cache (300s for rank/account,
+// 86400s for match details) so repeated requests are fast.
+export const dynamic = 'force-dynamic'
 
 interface PlayerInput { gameName: string; tagLine: string }
 
