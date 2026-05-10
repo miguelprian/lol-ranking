@@ -11,10 +11,13 @@ interface RankData {
   wins: number; losses: number; winrate: number
 }
 interface MatchResult { win: boolean; champion: string }
+interface ChampionStat { champion: string; games: number; wins: number; wr: number }
 interface Player {
   gameName: string; tagLine: string; profileIconId: number
   summonerLevel: number; rank: RankData | null
-  recentMatches: MatchResult[] | null; error: string | null
+  recentMatches: MatchResult[] | null
+  topChampion: ChampionStat | null
+  error: string | null
 }
 interface ApiResponse { players: Player[]; ddVersion: string; updatedAt: string }
 
@@ -48,17 +51,6 @@ function getStreak(matches: MatchResult[] | null) {
   return count >= 2 ? { type: first ? 'win' : 'loss' as const, count } : null
 }
 
-function getMostPlayed(matches: MatchResult[] | null) {
-  if (!matches?.length) return null
-  const map: Record<string, { g: number; w: number }> = {}
-  for (const m of matches) {
-    if (!map[m.champion]) map[m.champion] = { g: 0, w: 0 }
-    map[m.champion].g++
-    if (m.win) map[m.champion].w++
-  }
-  const [champ, s] = Object.entries(map).sort((a, b) => b[1].g - a[1].g)[0]
-  return { champ, games: s.g, wr: Math.round((s.w / s.g) * 100) }
-}
 
 function buildChartData(players: Player[]) {
   const maxLen = Math.max(...players.map((p) => p.recentMatches?.length ?? 0))
@@ -154,8 +146,51 @@ export default function Home() {
   ]
 
   return (
-    <main className="min-h-screen bg-[#060d1a] flex flex-col items-center py-12 px-4">
-      <div className="w-full max-w-3xl">
+    <main className="relative min-h-screen bg-[#060d1a] flex flex-col items-center py-12 px-4 overflow-x-hidden">
+
+      {/* ── Animated background ── */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        {/* Grid */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(99,102,241,1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+          }}
+        />
+        {/* Blob 1 — indigo, top right */}
+        <div
+          className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full opacity-[0.12]"
+          style={{
+            background: 'radial-gradient(circle, #4f46e5 0%, transparent 70%)',
+            filter: 'blur(80px)',
+            animation: 'blob-drift 14s ease-in-out infinite',
+          }}
+        />
+        {/* Blob 2 — violet, bottom left */}
+        <div
+          className="absolute bottom-[-5%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-[0.1]"
+          style={{
+            background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)',
+            filter: 'blur(80px)',
+            animation: 'blob-drift-b 18s ease-in-out infinite',
+          }}
+        />
+        {/* Blob 3 — gold accent, top left */}
+        <div
+          className="absolute top-[30%] left-[5%] w-[300px] h-[300px] rounded-full opacity-[0.05]"
+          style={{
+            background: 'radial-gradient(circle, #d97706 0%, transparent 70%)',
+            filter: 'blur(60px)',
+            animation: 'blob-drift 22s ease-in-out infinite reverse',
+          }}
+        />
+      </div>
+
+      <div className="relative w-full max-w-3xl">
 
         {/* ── Header ── */}
         <header className="text-center mb-10">
@@ -225,7 +260,7 @@ export default function Home() {
                 ))
               : data?.players.map((player, i) => {
                   const streak = getStreak(player.recentMatches)
-                  const mostPlayed = getMostPlayed(player.recentMatches)
+                  const topChamp = player.topChampion
                   return (
                     <div
                       key={`${player.gameName}#${player.tagLine}`}
@@ -309,22 +344,22 @@ export default function Home() {
                       </div>
 
                       {/* ─ Bottom row: champion + last 5 ─ */}
-                      {(mostPlayed || player.recentMatches?.length) && (
+                      {(topChamp || player.recentMatches?.length) && (
                         <div className="mt-4 flex items-center gap-3 flex-wrap pl-[54px]">
-                          {mostPlayed && (
+                          {topChamp && (
                             <div className="flex items-center gap-2 bg-[#090e1a] rounded-lg px-2.5 py-1.5 border border-[#0f1a2e]">
                               <img
-                                src={champUrl(mostPlayed.champ, data.ddVersion)} alt={mostPlayed.champ}
+                                src={champUrl(topChamp.champion, data.ddVersion)} alt={topChamp.champion}
                                 width={22} height={22}
                                 className="w-[22px] h-[22px] rounded-md object-cover"
                                 onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
                               />
-                              <span className="text-[#64748b] text-xs font-semibold">{mostPlayed.champ}</span>
+                              <span className="text-[#64748b] text-xs font-semibold">{topChamp.champion}</span>
                               <span className="text-[#1e2d45] text-xs">·</span>
-                              <span className="text-[#475569] text-xs">{mostPlayed.games}p</span>
+                              <span className="text-[#475569] text-xs">{topChamp.games}p</span>
                               <span className="text-[#1e2d45] text-xs">·</span>
-                              <span className={`text-xs font-bold ${mostPlayed.wr >= 50 ? 'text-emerald-500/80' : 'text-red-400/80'}`}>
-                                {mostPlayed.wr}% WR
+                              <span className={`text-xs font-bold ${topChamp.wr >= 50 ? 'text-emerald-500/80' : 'text-red-400/80'}`}>
+                                {topChamp.wr}% WR
                               </span>
                             </div>
                           )}
