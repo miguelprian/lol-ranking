@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Per-player champion stats endpoint.
-// Dynamic — no build-time prerender, no timeout issues.
-// Each PUUID is cached independently at the CDN level for 1 hour.
-export const dynamic = 'force-dynamic'
+// ISR per puuid — not prerendered at build time (no generateStaticParams),
+// rendered on first request then cached 1 hour. Vercel clears on each deploy.
+export const revalidate = 3600
 
 const CHAMPION_OVERRIDES: Record<string, string> = { FiddleSticks: 'Fiddlesticks' }
 const fixChamp = (n: string) => CHAMPION_OVERRIDES[n] ?? n
@@ -20,17 +19,19 @@ async function riotFetch(url: string, apiKey: string, cache: number): Promise<Re
   } catch { return null }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ puuid: string }> },
+) {
   const apiKey = process.env.RIOT_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'no key' }, { status: 500 })
 
-  const puuid = req.nextUrl.searchParams.get('puuid')
-  if (!puuid) return NextResponse.json({ error: 'missing puuid' }, { status: 400 })
+  const { puuid } = await params
 
   try {
-    // Fetch up to 200 match IDs (2 pages) — covers any player's full season
+    // Fetch up to 3 pages (300 games) — covers Season 2026 which has ~300 ranked games
     const allIds: string[] = []
-    for (let page = 0; page < 2; page++) {
+    for (let page = 0; page < 3; page++) {
       const url =
         `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
         `?queue=420&count=100&start=${page * 100}`
@@ -41,16 +42,11 @@ export async function GET(req: NextRequest) {
       if (batch.length < 100) break
     }
 
-    if (!allIds.length) {
-      return NextResponse.json({ topChampion: null }, {
-        headers: { 'Cache-Control': 'public, s-maxage=3600' },
-      })
-    }
+    if (!allIds.length) return NextResponse.json({ topChampion: null, totalGames: 0 })
 
-    // Fetch match details in chunks of 20 with 1.1 s gap to respect
-    // Riot's dev key rate limit (20 req/s, 100 req/2 min).
-    // Next.js Data Cache deduplicates across concurrent player requests
-    // (friends share matches → same match ID fetched only once).
+    // Fetch match details in chunks of 20 with 1.1 s gap — stays within
+    // Riot dev key rate limit. Next.js Data Cache deduplicates across players
+    // (shared matches only fetched once).
     const CHUNK = 20
     const DELAY = 1100
     const allMatches: { win: boolean; champion: string }[] = []
@@ -74,7 +70,6 @@ export async function GET(req: NextRequest) {
       if (i + CHUNK < allIds.length) await sleep(DELAY)
     }
 
-    // Aggregate season champion stats
     const map: Record<string, { g: number; w: number }> = {}
     for (const m of allMatches) {
       if (!map[m.champion]) map[m.champion] = { g: 0, w: 0 }
@@ -82,18 +77,16 @@ export async function GET(req: NextRequest) {
       if (m.win) map[m.champion].w++
     }
 
-    const ranked = Object.entries(map)
-      .sort((a, b) => b[1].g - a[1].g)
-      .map(([champion, s]) => ({
-        champion, games: s.g, wins: s.w,
-        wr: Math.round((s.w / s.g) * 100),
-      }))
+    const topChampion =
+      Object.entries(map)
+        .sort((a, b) => b[1].g - a[1].g)
+        .map(([champion, s]) => ({
+          champion, games: s.g, wins: s.w,
+          wr: Math.round((s.w / s.g) * 100),
+        }))[0] ?? null
 
-    return NextResponse.json(
-      { topChampion: ranked[0] ?? null, totalGames: allMatches.length },
-      { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300' } },
-    )
+    return NextResponse.json({ topChampion, totalGames: allMatches.length })
   } catch {
-    return NextResponse.json({ topChampion: null }, { status: 500 })
+    return NextResponse.json({ topChampion: null, totalGames: 0 }, { status: 500 })
   }
 }

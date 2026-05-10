@@ -115,7 +115,7 @@ export default function Home() {
       const delay = idx * 1500
       const timer = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/champ?puuid=${player.puuid}`)
+          const res = await fetch(`/api/champ/${player.puuid}`)
           if (!res.ok) return
           const json = await res.json()
           setChampStats((prev) => ({ ...prev, [player.puuid]: json.topChampion ?? null }))
