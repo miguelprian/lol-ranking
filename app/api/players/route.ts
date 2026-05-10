@@ -41,9 +41,6 @@ const PLAYERS: PlayerInput[] = [
 const TIER_ORDER = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER']
 const DIV_ORDER  = ['IV','III','II','I']
 
-// Season 2026 (Split 1) — 9 Jan 2026 00:00:00 UTC
-const SEASON_START = 1767916800
-
 const CHAMPION_OVERRIDES: Record<string, string> = { FiddleSticks: 'Fiddlesticks' }
 const fixChamp = (name: string) => CHAMPION_OVERRIDES[name] ?? name
 
@@ -72,16 +69,17 @@ async function riotFetch(url: string, apiKey: string, cacheSeconds: number): Pro
 }
 
 /**
- * Fetches ranked solo/duo match IDs for the current season (Season 2026).
- * 2 pages max = up to 200 games, enough for any active player.
+ * Fetches the last 200 ranked solo/duo match IDs (no startTime filter).
+ * This covers any player's full current season regardless of when it started.
+ * 2 pages × 100 = 200 max.
  */
-async function getSeasonMatchIds(puuid: string, apiKey: string): Promise<string[]> {
+async function getRecentMatchIds(puuid: string, apiKey: string): Promise<string[]> {
   const allIds: string[] = []
 
   for (let page = 0; page < 2; page++) {
     const url =
       `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
-      `?queue=420&count=100&start=${page * 100}&startTime=${SEASON_START}`
+      `?queue=420&count=100&start=${page * 100}`
 
     const res = await riotFetch(url, apiKey, 300)
     if (!res?.ok) break
@@ -99,7 +97,7 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<{
   topChampion: ChampionStat | null
 }> {
   try {
-    const allIds = await getSeasonMatchIds(puuid, apiKey)
+    const allIds = await getRecentMatchIds(puuid, apiKey)
     if (!allIds.length) return { recentMatches: [], topChampion: null }
 
     // Fetch all match details in parallel (24 h Data Cache — reused across routes).
