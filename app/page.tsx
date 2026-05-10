@@ -13,10 +13,10 @@ interface RankData {
 interface MatchResult { win: boolean; champion: string }
 interface ChampionStat { champion: string; games: number; wins: number; wr: number }
 interface Player {
+  puuid: string
   gameName: string; tagLine: string; profileIconId: number
   summonerLevel: number; rank: RankData | null
   recentMatches: MatchResult[] | null
-  topChampion: ChampionStat | null
   error: string | null
 }
 interface ApiResponse { players: Player[]; ddVersion: string; updatedAt: string }
@@ -90,6 +90,7 @@ export default function Home() {
   const [countdown, setCountdown] = useState(300)
   const [activeTab, setActiveTab] = useState<Tab>('ranking')
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string> | null>(null)
+  const [champStats, setChampStats] = useState<Record<string, ChampionStat | null>>({})
 
   const fetchData = useCallback(async () => {
     setLoading(true); setFetchError(null)
@@ -104,6 +105,25 @@ export default function Home() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // After main data loads, fetch champion stats per player with 1.5s stagger
+  // to avoid hitting Riot API rate limits simultaneously.
+  useEffect(() => {
+    if (!data?.players.length) return
+    data.players.forEach((player, idx) => {
+      if (!player.puuid) return
+      const delay = idx * 1500
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/champ?puuid=${player.puuid}`)
+          if (!res.ok) return
+          const json = await res.json()
+          setChampStats((prev) => ({ ...prev, [player.puuid]: json.topChampion ?? null }))
+        } catch { /* ignore */ }
+      }, delay)
+      return () => clearTimeout(timer)
+    })
+  }, [data])
   useEffect(() => {
     const id = setInterval(() => {
       setCountdown((p) => { if (p <= 1) { fetchData(); return 300 } return p - 1 })
@@ -260,7 +280,8 @@ export default function Home() {
                 ))
               : data?.players.map((player, i) => {
                   const streak = getStreak(player.recentMatches)
-                  const topChamp = player.topChampion
+                  const topChamp = champStats[player.puuid]
+                  const champLoading = player.puuid && !(player.puuid in champStats)
                   return (
                     <div
                       key={`${player.gameName}#${player.tagLine}`}
@@ -344,15 +365,18 @@ export default function Home() {
                       </div>
 
                       {/* ─ Bottom area: most played champ + last 5 ─ */}
-                      {(topChamp || player.recentMatches?.length) && (
+                      {(topChamp || champLoading || player.recentMatches?.length) && (
                         <div className="mt-4 pl-[54px] flex items-start gap-4 flex-wrap">
 
                           {/* Most played champion card */}
-                          {topChamp && (
+                          {(topChamp || champLoading) && (
                             <div className="flex-1 min-w-[190px] max-w-[260px]">
                               <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-400/60 mb-1.5">
                                 ✦ Most Played Champ
                               </p>
+                              {champLoading && !topChamp ? (
+                                <div className="relative overflow-hidden rounded-xl border border-indigo-500/10 bg-[#080d1c] animate-pulse h-[52px]" />
+                              ) : topChamp ? (
                               <div
                                 className="relative overflow-hidden rounded-xl border border-indigo-500/20"
                                 style={{ boxShadow: '0 0 18px rgba(79,70,229,0.15), inset 0 1px 0 rgba(255,255,255,0.04)' }}
@@ -372,24 +396,25 @@ export default function Home() {
                                 {/* Content */}
                                 <div className="relative flex items-center gap-2.5 px-3 py-2.5">
                                   <img
-                                    src={champUrl(topChamp.champion, data.ddVersion)}
-                                    alt={topChamp.champion}
+                                    src={champUrl(topChamp!.champion, data.ddVersion)}
+                                    alt={topChamp!.champion}
                                     width={36} height={36}
                                     className="w-9 h-9 rounded-lg object-cover border border-indigo-500/30 shadow-md shadow-indigo-950/60 shrink-0"
                                     onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-white text-sm font-bold leading-tight truncate">{topChamp.champion}</p>
-                                    <p className="text-indigo-300/50 text-[11px] mt-0.5">{topChamp.games} partidas</p>
+                                    <p className="text-white text-sm font-bold leading-tight truncate">{topChamp!.champion}</p>
+                                    <p className="text-indigo-300/50 text-[11px] mt-0.5">{topChamp!.games} partidas</p>
                                   </div>
                                   <div className="text-right shrink-0">
-                                    <p className={`text-xl font-black leading-none ${topChamp.wr >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                      {topChamp.wr}%
+                                    <p className={`text-xl font-black leading-none ${topChamp!.wr >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                      {topChamp!.wr}%
                                     </p>
                                     <p className="text-[#334155] text-[9px] mt-0.5 uppercase tracking-wide">WR</p>
                                   </div>
                                 </div>
                               </div>
+                              ) : null}
                             </div>
                           )}
 
