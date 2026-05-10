@@ -102,6 +102,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(300)
+  const [selectedChartPlayers, setSelectedChartPlayers] = useState<Set<string> | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -152,6 +153,22 @@ export default function Home() {
 
   const chartData = data ? buildChartData(data.players) : []
   const playersWithMatches = data?.players.filter((p) => p.recentMatches && p.recentMatches.length > 0) ?? []
+
+  const visibleChartPlayers = playersWithMatches.filter(
+    (p) => selectedChartPlayers === null || selectedChartPlayers.has(p.gameName)
+  )
+
+  function toggleChartPlayer(name: string) {
+    setSelectedChartPlayers((prev) => {
+      const all = new Set(playersWithMatches.map((p) => p.gameName))
+      const current = prev ?? all
+      if (current.has(name) && current.size === 1) return all
+      const next = new Set(current)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next.size === all.size ? null : next
+    })
+  }
 
   return (
     <main className="min-h-screen bg-[#060d1a] py-10 px-4">
@@ -342,9 +359,36 @@ export default function Home() {
             <h2 className="text-white text-sm font-bold tracking-widest uppercase mb-1">
               Forma reciente
             </h2>
-            <p className="text-[#334155] text-xs mb-5">
+            <p className="text-[#334155] text-xs mb-4">
               Últimas {chartData.length} partidas ranked · +1 victoria / −1 derrota
             </p>
+
+            {/* Player filter toggles */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {playersWithMatches.map((player, idx) => {
+                const color = CHART_COLORS[idx % CHART_COLORS.length]
+                const isActive = selectedChartPlayers === null || selectedChartPlayers.has(player.gameName)
+                return (
+                  <button
+                    key={player.gameName}
+                    onClick={() => toggleChartPlayer(player.gameName)}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all duration-150 border"
+                    style={{
+                      borderColor: isActive ? color + '60' : '#161e30',
+                      backgroundColor: isActive ? color + '15' : 'transparent',
+                      color: isActive ? color : '#334155',
+                    }}
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: isActive ? color : '#1e2d45' }}
+                    />
+                    {player.gameName}
+                  </button>
+                )
+              })}
+            </div>
+
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <XAxis
@@ -374,33 +418,23 @@ export default function Home() {
                     name as string,
                   ]}
                 />
-                {playersWithMatches.map((player, idx) => (
-                  <Line
-                    key={player.gameName}
-                    type="monotone"
-                    dataKey={player.gameName}
-                    stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    connectNulls
-                  />
-                ))}
+                {visibleChartPlayers.map((player) => {
+                  const idx = playersWithMatches.findIndex((p) => p.gameName === player.gameName)
+                  return (
+                    <Line
+                      key={player.gameName}
+                      type="monotone"
+                      dataKey={player.gameName}
+                      stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                      connectNulls
+                    />
+                  )
+                })}
               </LineChart>
             </ResponsiveContainer>
-
-            {/* Legend */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4">
-              {playersWithMatches.map((player, idx) => (
-                <div key={player.gameName} className="flex items-center gap-1.5">
-                  <div
-                    className="w-3 h-0.5 rounded-full"
-                    style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
-                  />
-                  <span className="text-[#475569] text-xs">{player.gameName}</span>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 

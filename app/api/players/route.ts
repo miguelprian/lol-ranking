@@ -77,7 +77,9 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<MatchResu
           const match = await matchRes.json()
           const participant = match.info.participants.find((p: any) => p.puuid === puuid)
           if (!participant) return null
-          return { win: participant.win as boolean, champion: participant.championName as string }
+          const CHAMPION_OVERRIDES: Record<string, string> = { FiddleSticks: 'Fiddlesticks' }
+          const champion = CHAMPION_OVERRIDES[participant.championName] ?? participant.championName
+          return { win: participant.win as boolean, champion }
         } catch {
           return null
         }

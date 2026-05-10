@@ -12,6 +12,7 @@ const PLAYERS: PlayerInput[] = [
   { gameName: 'EL BICHARRACO', tagLine: 'CR7' },
   { gameName: 'EL PELUCA', tagLine: '232' },
   { gameName: 'QUE СОМА РΕLО', tagLine: 'LEWI' },
+  { gameName: 'rësılıencë', tagLine: 'EUW' },
 ]
 
 async function getDDragonVersion(): Promise<string> {
@@ -88,6 +89,11 @@ export async function GET() {
     })
   )
 
+  const CHAMPION_NAME_OVERRIDES: Record<string, string> = {
+    FiddleSticks: 'Fiddlesticks',
+  }
+  const normalizeChampion = (name: string) => CHAMPION_NAME_OVERRIDES[name] ?? name
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const matches = matchDetails
     .filter((m): m is NonNullable<typeof m> => m !== null)
@@ -101,7 +107,7 @@ export async function GET() {
         displayName: p.riotIdGameName
           ? `${p.riotIdGameName}#${p.riotIdTagline}`
           : (p.summonerName as string),
-        championName: p.championName as string,
+        championName: normalizeChampion(p.championName as string),
         champLevel: p.champLevel as number,
         teamId: p.teamId as number,
         kills: p.kills as number,
