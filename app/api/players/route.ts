@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 
-// Dynamic route — compute fresh on every request.
-// Individual Riot API fetches are cached by Next.js Data Cache:
-//   - match IDs: 5 min (revalidate: 300)
-//   - match details: 24 h (revalidate: 86400)
-// So cold loads are slow once, then fast.
+// Dynamic so it can read env vars at runtime.
+// Actual caching is via CDN Cache-Control headers (set on the response below):
+//   s-maxage=300 → Vercel CDN caches for 5 min, shared across all users
+//   stale-while-revalidate=60 → serves stale instantly while recomputing in bg
 export const dynamic = 'force-dynamic'
 
 interface PlayerInput { gameName: string; tagLine: string }
@@ -39,11 +38,11 @@ const PLAYERS: PlayerInput[] = [
   { gameName: 'rësılıencë', tagLine: 'EUW' },
 ]
 
-const TIER_ORDER  = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER']
-const DIV_ORDER   = ['IV','III','II','I']
+const TIER_ORDER = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER']
+const DIV_ORDER  = ['IV','III','II','I']
 
-// Season 2025 (Split 1) start — 9 Jan 2025 00:00:00 UTC
-const SEASON_2025_START = 1736380800
+// Season 2026 (Split 1) — 9 Jan 2026 00:00:00 UTC
+const SEASON_START = 1767916800
 
 const CHAMPION_OVERRIDES: Record<string, string> = { FiddleSticks: 'Fiddlesticks' }
 const fixChamp = (name: string) => CHAMPION_OVERRIDES[name] ?? name
@@ -58,43 +57,38 @@ async function getDDragonVersion(): Promise<string> {
   } catch { return '15.8.1' }
 }
 
-/** Riot returns 429 when rate-limited.  Retry once after the indicated delay. */
+/** One-retry wrapper that honours Riot's Retry-After header on 429. */
 async function riotFetch(url: string, apiKey: string, cacheSeconds: number): Promise<Response | null> {
-  const opts = {
-    headers: { 'X-Riot-Token': apiKey },
-    next: { revalidate: cacheSeconds },
-  }
+  const opts = { headers: { 'X-Riot-Token': apiKey }, next: { revalidate: cacheSeconds } }
   try {
-    const res = await fetch(url, opts)
+    let res = await fetch(url, opts)
     if (res.status === 429) {
-      const wait = parseInt(res.headers.get('Retry-After') ?? '1', 10) * 1000
-      await new Promise((r) => setTimeout(r, Math.min(wait, 5000)))
-      return fetch(url, opts)
+      const wait = Math.min(parseInt(res.headers.get('Retry-After') ?? '1', 10) * 1000, 5000)
+      await new Promise((r) => setTimeout(r, wait))
+      res = await fetch(url, opts)
     }
     return res
   } catch { return null }
 }
 
 /**
- * Fetches ALL ranked solo/duo match IDs since Season 2025 start.
- * Paginates 100 at a time, max 700 games.
+ * Fetches ranked solo/duo match IDs for the current season (Season 2026).
+ * 2 pages max = up to 200 games, enough for any active player.
  */
-async function getAllSeasonMatchIds(puuid: string, apiKey: string): Promise<string[]> {
+async function getSeasonMatchIds(puuid: string, apiKey: string): Promise<string[]> {
   const allIds: string[] = []
-  const PAGE_SIZE = 100
-  const MAX_PAGES = 7 // up to 700 games
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  for (let page = 0; page < 2; page++) {
     const url =
       `https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
-      `?queue=420&count=${PAGE_SIZE}&start=${page * PAGE_SIZE}&startTime=${SEASON_2025_START}`
+      `?queue=420&count=100&start=${page * 100}&startTime=${SEASON_START}`
 
     const res = await riotFetch(url, apiKey, 300)
     if (!res?.ok) break
 
     const ids: string[] = await res.json()
     allIds.push(...ids)
-    if (ids.length < PAGE_SIZE) break // last page
+    if (ids.length < 100) break
   }
 
   return allIds
@@ -105,17 +99,16 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<{
   topChampion: ChampionStat | null
 }> {
   try {
-    const allIds = await getAllSeasonMatchIds(puuid, apiKey)
+    const allIds = await getSeasonMatchIds(puuid, apiKey)
     if (!allIds.length) return { recentMatches: [], topChampion: null }
 
-    // Fetch all match details (24h cache — shared across players and routes)
+    // Fetch all match details in parallel (24 h Data Cache — reused across routes).
     const results = await Promise.all(
-      allIds.map(async (matchId) => {
+      allIds.map(async (id) => {
         try {
           const res = await riotFetch(
-            `https://europe.api.riotgames.com/lol/match/v5/matches/${matchId}`,
-            apiKey,
-            86400,
+            `https://europe.api.riotgames.com/lol/match/v5/matches/${id}`,
+            apiKey, 86400,
           )
           if (!res?.ok) return null
           const match = await res.json()
@@ -128,26 +121,23 @@ async function getMatchHistory(puuid: string, apiKey: string): Promise<{
 
     const allMatches = results.filter((r): r is MatchResult => r !== null)
 
-    // Compute per-champion stats across the full season
-    const champMap: Record<string, { games: number; wins: number }> = {}
+    // Season champion stats
+    const map: Record<string, { g: number; w: number }> = {}
     for (const m of allMatches) {
-      if (!champMap[m.champion]) champMap[m.champion] = { games: 0, wins: 0 }
-      champMap[m.champion].games++
-      if (m.win) champMap[m.champion].wins++
+      if (!map[m.champion]) map[m.champion] = { g: 0, w: 0 }
+      map[m.champion].g++
+      if (m.win) map[m.champion].w++
     }
 
     const topChampion =
-      Object.entries(champMap)
-        .sort((a, b) => b[1].games - a[1].games)
+      Object.entries(map)
+        .sort((a, b) => b[1].g - a[1].g)
         .map(([champion, s]) => ({
-          champion, games: s.games, wins: s.wins,
-          wr: Math.round((s.wins / s.games) * 100),
+          champion, games: s.g, wins: s.w,
+          wr: Math.round((s.w / s.g) * 100),
         }))[0] ?? null
 
-    return {
-      recentMatches: allMatches.slice(0, 20), // last 20 for the icons row
-      topChampion,
-    }
+    return { recentMatches: allMatches.slice(0, 20), topChampion }
   } catch { return { recentMatches: [], topChampion: null } }
 }
 
@@ -168,23 +158,15 @@ async function getPlayerData(player: PlayerInput, apiKey: string): Promise<Playe
     const account = await accountRes.json()
 
     const [summonerRes, rankedRes, matchData] = await Promise.all([
-      riotFetch(
-        `https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`,
-        apiKey, 300,
-      ),
-      riotFetch(
-        `https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
-        apiKey, 300,
-      ),
+      riotFetch(`https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`, apiKey, 300),
+      riotFetch(`https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, apiKey, 300),
       getMatchHistory(account.puuid, apiKey),
     ])
 
     if (!summonerRes?.ok) return fallback('Invocador no encontrado')
     const summoner = await summonerRes.json()
-    const ranked: {
-      queueType: string; tier: string; rank: string
-      leaguePoints: number; wins: number; losses: number
-    }[] = rankedRes?.ok ? await rankedRes.json() : []
+    const ranked: { queueType: string; tier: string; rank: string; leaguePoints: number; wins: number; losses: number }[] =
+      rankedRes?.ok ? await rankedRes.json() : []
     const solo = ranked.find((e) => e.queueType === 'RANKED_SOLO_5x5')
 
     return {
@@ -226,9 +208,14 @@ export async function GET() {
     getDDragonVersion(),
   ])
 
-  return NextResponse.json({
-    players: sortPlayers(players),
-    ddVersion,
-    updatedAt: new Date().toISOString(),
+  const body = { players: sortPlayers(players), ddVersion, updatedAt: new Date().toISOString() }
+
+  // Cache at Vercel CDN for 5 min, serve stale instantly while recomputing in background.
+  // This means the slow computation (fetching all season matches) happens at most
+  // once every 5 minutes and is shared across all users.
+  return NextResponse.json(body, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
+    },
   })
 }
