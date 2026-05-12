@@ -11,7 +11,7 @@ interface RankData {
   wins: number; losses: number; winrate: number
 }
 interface MatchResult { win: boolean; champion: string }
-interface ChampionStat { champion: string; games: number; wins: number; wr: number }
+interface ChampionStat { champion: string; masteryLevel: number; masteryPoints: number }
 interface Player {
   puuid: string
   gameName: string; tagLine: string; profileIconId: number
@@ -225,7 +225,7 @@ export default function Home() {
           <h2 className="text-4xl font-black text-[#4f46e5] tracking-tight uppercase leading-tight mt-1">
             Ranking
           </h2>
-          <p className="text-[#283548] text-sm mt-3 tracking-widest uppercase">de los Chavales</p>
+          <p className="text-[#283548] text-sm mt-3 tracking-widest uppercase">los Chavales</p>
           <div className="flex items-center justify-center gap-5 mt-5">
             {data && <span className="text-[#1e2d45] text-sm tabular-nums">Actualiza en {fmt(countdown)}</span>}
             <button
@@ -371,7 +371,7 @@ export default function Home() {
                           {(topChamp || champLoading) && (
                             <div className="flex-1 min-w-[160px] sm:min-w-[190px] max-w-[260px]">
                               <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-400/60 mb-1.5">
-                                ✦ Most Played Champ
+                                ✦ Top Mastery
                               </p>
                               {champLoading && !topChamp ? (
                                 <div className="relative overflow-hidden rounded-xl border border-indigo-500/10 bg-[#080d1c] animate-pulse h-[52px]" />
@@ -403,13 +403,15 @@ export default function Home() {
                                   />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-white text-sm font-bold leading-tight truncate">{topChamp!.champion}</p>
-                                    <p className="text-indigo-300/50 text-[11px] mt-0.5">{topChamp!.games} partidas</p>
+                                    <p className="text-indigo-300/50 text-[11px] mt-0.5">Maestría {topChamp!.masteryLevel}</p>
                                   </div>
                                   <div className="text-right shrink-0">
-                                    <p className={`text-xl font-black leading-none ${topChamp!.wr >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                      {topChamp!.wr}%
+                                    <p className="text-xl font-black leading-none text-indigo-400">
+                                      {topChamp!.masteryPoints >= 1_000_000
+                                        ? `${(topChamp!.masteryPoints / 1_000_000).toFixed(1)}M`
+                                        : `${Math.round(topChamp!.masteryPoints / 1000)}k`}
                                     </p>
-                                    <p className="text-[#334155] text-[9px] mt-0.5 uppercase tracking-wide">WR</p>
+                                    <p className="text-[#334155] text-[9px] mt-0.5 uppercase tracking-wide">pts</p>
                                   </div>
                                 </div>
                               </div>
