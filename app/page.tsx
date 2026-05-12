@@ -137,8 +137,14 @@ export default function Home() {
     const ext = t === 'EMERALD' ? 'svg' : 'png'
     return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${t.toLowerCase()}.${ext}`
   }
-  const opggUrl = (g: string, t: string) =>
+  const opggUrl    = (g: string, t: string) =>
     `https://www.op.gg/summoners/euw/${encodeURIComponent(g)}-${encodeURIComponent(t)}`
+  const deeplolUrl = (g: string, t: string) =>
+    `https://www.deeplol.gg/summoner/EUW/${encodeURIComponent(g)}-${encodeURIComponent(t)}`
+  const uggUrl     = (g: string, t: string) =>
+    `https://u.gg/lol/profile/euw1/${encodeURIComponent(g)}-${encodeURIComponent(t)}/overview`
+  const dpmUrl     = (g: string, t: string) =>
+    `https://dpm.lol/summoner/euw/${encodeURIComponent(g)}-${encodeURIComponent(t)}`
   const champUrl = (c: string, v: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${v}/img/champion/${c}.png`
 
@@ -273,7 +279,11 @@ export default function Home() {
                         <div className="h-5 bg-[#161e30] rounded w-36 sm:w-48" />
                         <div className="h-4 bg-[#161e30] rounded w-48 sm:w-64" />
                       </div>
-                      <div className="w-14 sm:w-24 h-9 sm:h-10 bg-[#161e30] rounded-xl" />
+                      <div className="shrink-0 flex flex-col gap-1">
+                        {Array.from({ length: 4 }).map((_, k) => (
+                          <div key={k} className="w-[62px] h-[26px] bg-[#161e30] rounded-lg" />
+                        ))}
+                      </div>
                     </div>
                     <div className="mt-3 sm:mt-4 h-4 bg-[#161e30] rounded w-full sm:w-72" />
                   </div>
@@ -352,15 +362,25 @@ export default function Home() {
                           )}
                         </div>
 
-                        {/* OP.GG button */}
-                        <a
-                          href={opggUrl(player.gameName, player.tagLine)}
-                          target="_blank" rel="noopener noreferrer"
-                          className="shrink-0 flex flex-col items-center justify-center gap-0.5 bg-[#0d1f38] hover:bg-[#12284a] border border-[#1a3560]/60 hover:border-[#2d5a9e]/70 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all duration-200 group"
-                        >
-                          <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-xs sm:text-sm font-black tracking-wider transition-colors">OP.GG</span>
-                          <span className="hidden sm:block text-[#1e3a5f] group-hover:text-[#2d5a8a] text-[10px] font-medium transition-colors">Ver perfil ↗</span>
-                        </a>
+                        {/* Profile links */}
+                        <div className="shrink-0 flex flex-col gap-1">
+                          <a href={opggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#0d1f38] hover:bg-[#12284a] border-[#1a3560]/60 hover:border-[#2d5a9e]/70">
+                            <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-[11px] font-black tracking-wider transition-colors">OP.GG</span>
+                          </a>
+                          <a href={deeplolUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#130e24] hover:bg-[#1c1535] border-[#5b21b6]/40 hover:border-[#7c3aed]/60">
+                            <span className="text-[#a78bfa] group-hover:text-[#c4b5fd] text-[11px] font-black tracking-wider transition-colors">DEEPLOL</span>
+                          </a>
+                          <a href={uggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#071c23] hover:bg-[#0c2a35] border-[#0e7490]/40 hover:border-[#0891b2]/60">
+                            <span className="text-[#22d3ee] group-hover:text-[#67e8f9] text-[11px] font-black tracking-wider transition-colors">U.GG</span>
+                          </a>
+                          <a href={dpmUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#1c1302] hover:bg-[#261a03] border-[#92400e]/40 hover:border-[#d97706]/60">
+                            <span className="text-[#f59e0b] group-hover:text-[#fcd34d] text-[11px] font-black tracking-wider transition-colors">DPM</span>
+                          </a>
+                        </div>
                       </div>
 
                       {/* ─ Bottom area: most played champ + last 5 ─ */}
