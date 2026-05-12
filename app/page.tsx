@@ -249,7 +249,7 @@ export default function Home() {
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-wide transition-all duration-200 ${
+              className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all duration-200 ${
                 activeTab === t.id
                   ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-900/40'
                   : 'text-[#334155] hover:text-[#64748b] hover:bg-[#0f1a2e]'
@@ -266,16 +266,16 @@ export default function Home() {
             {loading && !data
               ? Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="bg-[#0c1525] rounded-2xl border border-[#111d30] p-5 animate-pulse">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-8 bg-[#161e30] rounded" />
-                      <div className="w-[68px] h-[68px] bg-[#161e30] rounded-full" />
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-8 sm:w-10 h-8 bg-[#161e30] rounded" />
+                      <div className="w-[52px] h-[52px] sm:w-[68px] sm:h-[68px] bg-[#161e30] rounded-full" />
                       <div className="flex-1 space-y-3">
-                        <div className="h-5 bg-[#161e30] rounded w-48" />
-                        <div className="h-4 bg-[#161e30] rounded w-64" />
+                        <div className="h-5 bg-[#161e30] rounded w-36 sm:w-48" />
+                        <div className="h-4 bg-[#161e30] rounded w-48 sm:w-64" />
                       </div>
-                      <div className="w-24 h-10 bg-[#161e30] rounded-xl" />
+                      <div className="w-14 sm:w-24 h-9 sm:h-10 bg-[#161e30] rounded-xl" />
                     </div>
-                    <div className="mt-4 ml-14 h-4 bg-[#161e30] rounded w-72" />
+                    <div className="mt-3 sm:mt-4 h-4 bg-[#161e30] rounded w-full sm:w-72" />
                   </div>
                 ))
               : data?.players.map((player, i) => {
@@ -289,22 +289,21 @@ export default function Home() {
                       style={getCardGlow(i)}
                     >
                       {/* ─ Top row ─ */}
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4">
 
                         {/* Position */}
-                        <div className="shrink-0 w-10 flex items-center justify-center">
+                        <div className="shrink-0 w-8 sm:w-10 flex items-center justify-center">
                           {i < 3
-                            ? <span className="text-2xl leading-none">{MEDALS[i]}</span>
-                            : <span className="text-xl font-black text-[#334155]">{i + 1}</span>}
+                            ? <span className="text-xl sm:text-2xl leading-none">{MEDALS[i]}</span>
+                            : <span className="text-lg sm:text-xl font-black text-[#334155]">{i + 1}</span>}
                         </div>
 
                         {/* Avatar */}
                         <div className="relative shrink-0">
                           <img
                             src={iconUrl(player.profileIconId, data.ddVersion)}
-                            alt="icon" width={68} height={68}
-                            style={{ width: 68, height: 68, borderRadius: '50%' }}
-                            className="border-2 border-[#1e2d45]"
+                            alt="icon"
+                            className="w-[52px] h-[52px] sm:w-[68px] sm:h-[68px] rounded-full border-2 border-[#1e2d45] object-cover"
                             onError={(e) => { ;(e.target as HTMLImageElement).src = iconUrl(29, data.ddVersion) }}
                           />
                           <span className="absolute -bottom-1.5 -right-1 text-[10px] bg-[#060d1a] border border-[#1e2d45] text-[#475569] px-1.5 py-px rounded-full font-bold leading-tight">
@@ -315,11 +314,11 @@ export default function Home() {
                         {/* Name + rank */}
                         <div className="flex-1 min-w-0">
                           {/* Name row */}
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <span className="text-white font-bold text-lg leading-tight">{player.gameName}</span>
-                            <span className="text-[#1e2d45] text-sm">#{player.tagLine}</span>
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1.5 sm:mb-2">
+                            <span className="text-white font-bold text-base sm:text-lg leading-tight">{player.gameName}</span>
+                            <span className="text-[#1e2d45] text-xs sm:text-sm">#{player.tagLine}</span>
                             {streak && (
-                              <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full border ${
                                 streak.type === 'win'
                                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                                   : 'bg-red-500/15 text-red-400 border-red-500/25'
@@ -332,21 +331,21 @@ export default function Home() {
                           {player.error ? (
                             <p className="text-red-400/70 text-sm">{player.error}</p>
                           ) : player.rank ? (
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                               <img
                                 src={emblemUrl(player.rank.tier)} alt={player.rank.tier}
-                                width={18} height={18} className="w-[18px] h-[18px] object-contain"
+                                width={16} height={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] object-contain"
                                 onError={(e) => { ;(e.target as HTMLImageElement).style.display = 'none' }}
                               />
-                              <span className="text-sm font-bold" style={{ color: TIER_COLORS[player.rank.tier] ?? '#9ca3af' }}>
+                              <span className="text-xs sm:text-sm font-bold" style={{ color: TIER_COLORS[player.rank.tier] ?? '#9ca3af' }}>
                                 {getRankLabel(player.rank)}
                               </span>
-                              <span className="text-white text-sm font-bold">{player.rank.lp} LP</span>
-                              <span className="w-px h-4 bg-[#1a2840] mx-0.5 shrink-0" />
-                              <span className="text-green-400/90 text-sm">{player.rank.wins}W</span>
-                              <span className="text-red-400/90 text-sm">{player.rank.losses}L</span>
-                              <span className="text-[#334155] text-sm">·</span>
-                              <span className="text-[#94a3b8] text-sm font-semibold">{player.rank.winrate}%</span>
+                              <span className="text-white text-xs sm:text-sm font-bold">{player.rank.lp} LP</span>
+                              <span className="w-px h-3 sm:h-4 bg-[#1a2840] mx-0.5 shrink-0" />
+                              <span className="text-green-400/90 text-xs sm:text-sm">{player.rank.wins}W</span>
+                              <span className="text-red-400/90 text-xs sm:text-sm">{player.rank.losses}L</span>
+                              <span className="text-[#334155] text-xs sm:text-sm">·</span>
+                              <span className="text-[#94a3b8] text-xs sm:text-sm font-semibold">{player.rank.winrate}%</span>
                             </div>
                           ) : (
                             <p className="text-[#1e2d45] text-sm">Sin clasificar</p>
@@ -357,20 +356,20 @@ export default function Home() {
                         <a
                           href={opggUrl(player.gameName, player.tagLine)}
                           target="_blank" rel="noopener noreferrer"
-                          className="shrink-0 flex flex-col items-center justify-center gap-0.5 bg-[#0d1f38] hover:bg-[#12284a] border border-[#1a3560]/60 hover:border-[#2d5a9e]/70 px-4 py-2.5 rounded-xl transition-all duration-200 group"
+                          className="shrink-0 flex flex-col items-center justify-center gap-0.5 bg-[#0d1f38] hover:bg-[#12284a] border border-[#1a3560]/60 hover:border-[#2d5a9e]/70 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-all duration-200 group"
                         >
-                          <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-sm font-black tracking-wider transition-colors">OP.GG</span>
-                          <span className="text-[#1e3a5f] group-hover:text-[#2d5a8a] text-[10px] font-medium transition-colors">Ver perfil ↗</span>
+                          <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-xs sm:text-sm font-black tracking-wider transition-colors">OP.GG</span>
+                          <span className="hidden sm:block text-[#1e3a5f] group-hover:text-[#2d5a8a] text-[10px] font-medium transition-colors">Ver perfil ↗</span>
                         </a>
                       </div>
 
                       {/* ─ Bottom area: most played champ + last 5 ─ */}
                       {(topChamp || champLoading || player.recentMatches?.length) && (
-                        <div className="mt-4 pl-[54px] flex items-start gap-4 flex-wrap">
+                        <div className="mt-3 sm:mt-4 pl-0 sm:pl-[54px] flex items-start gap-3 sm:gap-4 flex-wrap">
 
                           {/* Most played champion card */}
                           {(topChamp || champLoading) && (
-                            <div className="flex-1 min-w-[190px] max-w-[260px]">
+                            <div className="flex-1 min-w-[160px] sm:min-w-[190px] max-w-[260px]">
                               <p className="text-[9px] font-black uppercase tracking-[0.22em] text-indigo-400/60 mb-1.5">
                                 ✦ Most Played Champ
                               </p>
