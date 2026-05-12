@@ -75,12 +75,10 @@ function computeGroupStats(players: Player[]) {
   const bestWr = ranked.length
     ? ranked.reduce((b, p) => p.rank!.winrate > b.rank!.winrate ? p : b)
     : null
-  const champMap: Record<string, number> = {}
-  players.forEach((p) => p.recentMatches?.forEach((m) => {
-    champMap[m.champion] = (champMap[m.champion] ?? 0) + 1
-  }))
-  const topChamp = Object.entries(champMap).sort((a, b) => b[1] - a[1])[0] ?? null
-  return { totalGames, totalWins, totalLosses, groupWr, bestWr, topChamp }
+  const worstWr = ranked.length
+    ? ranked.reduce((b, p) => p.rank!.winrate < b.rank!.winrate ? p : b)
+    : null
+  return { totalGames, totalWins, totalLosses, groupWr, bestWr, worstWr }
 }
 
 export default function Home() {
@@ -144,7 +142,7 @@ export default function Home() {
   const uggUrl     = (g: string, t: string) =>
     `https://u.gg/lol/profile/euw1/${encodeURIComponent(g)}-${encodeURIComponent(t)}/overview`
   const dpmUrl     = (g: string, t: string) =>
-    `https://dpm.lol/summoner/euw/${encodeURIComponent(g)}-${encodeURIComponent(t)}`
+    `https://dpm.lol/${encodeURIComponent(g)}-${encodeURIComponent(t)}`
   const champUrl = (c: string, v: string) =>
     `https://ddragon.leagueoflegends.com/cdn/${v}/img/champion/${c}.png`
 
@@ -295,97 +293,80 @@ export default function Home() {
                   return (
                     <div
                       key={`${player.gameName}#${player.tagLine}`}
-                      className="bg-[#0c1525] rounded-2xl border border-[#111d30] p-5 hover:border-[#1a2a40] transition-all duration-200"
+                      className="bg-[#0c1525] rounded-2xl border border-[#111d30] p-5 hover:border-[#1a2a40] transition-all duration-200 flex gap-3 sm:gap-4"
                       style={getCardGlow(i)}
                     >
-                      {/* ─ Top row ─ */}
-                      <div className="flex items-center gap-3 sm:gap-4">
+                      {/* ─ Main content (medal + avatar + info + bottom) ─ */}
+                      <div className="flex-1 flex flex-col gap-3 sm:gap-4 min-w-0">
 
-                        {/* Position */}
-                        <div className="shrink-0 w-8 sm:w-10 flex items-center justify-center">
-                          {i < 3
-                            ? <span className="text-xl sm:text-2xl leading-none">{MEDALS[i]}</span>
-                            : <span className="text-lg sm:text-xl font-black text-[#334155]">{i + 1}</span>}
-                        </div>
+                        {/* Top row */}
+                        <div className="flex items-center gap-3 sm:gap-4">
 
-                        {/* Avatar */}
-                        <div className="relative shrink-0">
-                          <img
-                            src={iconUrl(player.profileIconId, data.ddVersion)}
-                            alt="icon"
-                            className="w-[52px] h-[52px] sm:w-[68px] sm:h-[68px] rounded-full border-2 border-[#1e2d45] object-cover"
-                            onError={(e) => { ;(e.target as HTMLImageElement).src = iconUrl(29, data.ddVersion) }}
-                          />
-                          <span className="absolute -bottom-1.5 -right-1 text-[10px] bg-[#060d1a] border border-[#1e2d45] text-[#475569] px-1.5 py-px rounded-full font-bold leading-tight">
-                            {player.summonerLevel}
-                          </span>
-                        </div>
+                          {/* Position */}
+                          <div className="shrink-0 w-8 sm:w-10 flex items-center justify-center">
+                            {i < 3
+                              ? <span className="text-xl sm:text-2xl leading-none">{MEDALS[i]}</span>
+                              : <span className="text-lg sm:text-xl font-black text-[#334155]">{i + 1}</span>}
+                          </div>
 
-                        {/* Name + rank */}
-                        <div className="flex-1 min-w-0">
-                          {/* Name row */}
-                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1.5 sm:mb-2">
-                            <span className="text-white font-bold text-base sm:text-lg leading-tight">{player.gameName}</span>
-                            <span className="text-[#1e2d45] text-xs sm:text-sm">#{player.tagLine}</span>
-                            {streak && (
-                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full border ${
-                                streak.type === 'win'
-                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                  : 'bg-red-500/15 text-red-400 border-red-500/25'
-                              }`}>
-                                {streak.type === 'win' ? '🔥' : '💀'} {streak.count} seguidas
-                              </span>
+                          {/* Avatar */}
+                          <div className="relative shrink-0">
+                            <img
+                              src={iconUrl(player.profileIconId, data.ddVersion)}
+                              alt="icon"
+                              className="w-[52px] h-[52px] sm:w-[68px] sm:h-[68px] rounded-full border-2 border-[#1e2d45] object-cover"
+                              onError={(e) => { ;(e.target as HTMLImageElement).src = iconUrl(29, data.ddVersion) }}
+                            />
+                            <span className="absolute -bottom-1.5 -right-1 text-[10px] bg-[#060d1a] border border-[#1e2d45] text-[#475569] px-1.5 py-px rounded-full font-bold leading-tight">
+                              {player.summonerLevel}
+                            </span>
+                          </div>
+
+                          {/* Name + rank */}
+                          <div className="flex-1 min-w-0">
+                            {/* Name row */}
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1.5 sm:mb-2">
+                              <span className="text-white font-bold text-base sm:text-lg leading-tight">{player.gameName}</span>
+                              <span className="text-[#1e2d45] text-xs sm:text-sm">#{player.tagLine}</span>
+                              {streak && (
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-full border ${
+                                  streak.type === 'win'
+                                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-red-500/15 text-red-400 border-red-500/25'
+                                }`}>
+                                  {streak.type === 'win' ? '🔥' : '💀'} {streak.count} seguidas
+                                </span>
+                              )}
+                            </div>
+                            {/* Rank row */}
+                            {player.error ? (
+                              <p className="text-red-400/70 text-sm">{player.error}</p>
+                            ) : player.rank ? (
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <img
+                                  src={emblemUrl(player.rank.tier)} alt={player.rank.tier}
+                                  width={16} height={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] object-contain"
+                                  onError={(e) => { ;(e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                                <span className="text-xs sm:text-sm font-bold" style={{ color: TIER_COLORS[player.rank.tier] ?? '#9ca3af' }}>
+                                  {getRankLabel(player.rank)}
+                                </span>
+                                <span className="text-white text-xs sm:text-sm font-bold">{player.rank.lp} LP</span>
+                                <span className="w-px h-3 sm:h-4 bg-[#1a2840] mx-0.5 shrink-0" />
+                                <span className="text-green-400/90 text-xs sm:text-sm">{player.rank.wins}W</span>
+                                <span className="text-red-400/90 text-xs sm:text-sm">{player.rank.losses}L</span>
+                                <span className="text-[#334155] text-xs sm:text-sm">·</span>
+                                <span className="text-[#94a3b8] text-xs sm:text-sm font-semibold">{player.rank.winrate}%</span>
+                              </div>
+                            ) : (
+                              <p className="text-[#1e2d45] text-sm">Sin clasificar</p>
                             )}
                           </div>
-                          {/* Rank row */}
-                          {player.error ? (
-                            <p className="text-red-400/70 text-sm">{player.error}</p>
-                          ) : player.rank ? (
-                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                              <img
-                                src={emblemUrl(player.rank.tier)} alt={player.rank.tier}
-                                width={16} height={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] object-contain"
-                                onError={(e) => { ;(e.target as HTMLImageElement).style.display = 'none' }}
-                              />
-                              <span className="text-xs sm:text-sm font-bold" style={{ color: TIER_COLORS[player.rank.tier] ?? '#9ca3af' }}>
-                                {getRankLabel(player.rank)}
-                              </span>
-                              <span className="text-white text-xs sm:text-sm font-bold">{player.rank.lp} LP</span>
-                              <span className="w-px h-3 sm:h-4 bg-[#1a2840] mx-0.5 shrink-0" />
-                              <span className="text-green-400/90 text-xs sm:text-sm">{player.rank.wins}W</span>
-                              <span className="text-red-400/90 text-xs sm:text-sm">{player.rank.losses}L</span>
-                              <span className="text-[#334155] text-xs sm:text-sm">·</span>
-                              <span className="text-[#94a3b8] text-xs sm:text-sm font-semibold">{player.rank.winrate}%</span>
-                            </div>
-                          ) : (
-                            <p className="text-[#1e2d45] text-sm">Sin clasificar</p>
-                          )}
                         </div>
 
-                        {/* Profile links */}
-                        <div className="shrink-0 flex flex-col gap-1">
-                          <a href={opggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
-                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#0d1f38] hover:bg-[#12284a] border-[#1a3560]/60 hover:border-[#2d5a9e]/70">
-                            <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-[11px] font-black tracking-wider transition-colors">OP.GG</span>
-                          </a>
-                          <a href={deeplolUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
-                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#130e24] hover:bg-[#1c1535] border-[#5b21b6]/40 hover:border-[#7c3aed]/60">
-                            <span className="text-[#a78bfa] group-hover:text-[#c4b5fd] text-[11px] font-black tracking-wider transition-colors">DEEPLOL</span>
-                          </a>
-                          <a href={uggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
-                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#071c23] hover:bg-[#0c2a35] border-[#0e7490]/40 hover:border-[#0891b2]/60">
-                            <span className="text-[#22d3ee] group-hover:text-[#67e8f9] text-[11px] font-black tracking-wider transition-colors">U.GG</span>
-                          </a>
-                          <a href={dpmUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
-                            className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#1c1302] hover:bg-[#261a03] border-[#92400e]/40 hover:border-[#d97706]/60">
-                            <span className="text-[#f59e0b] group-hover:text-[#fcd34d] text-[11px] font-black tracking-wider transition-colors">DPM</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* ─ Bottom area: most played champ + last 5 ─ */}
-                      {(topChamp || champLoading || player.recentMatches?.length) && (
-                        <div className="mt-3 sm:mt-4 pl-0 sm:pl-[54px] flex items-start gap-3 sm:gap-4 flex-wrap">
+                        {/* ─ Bottom area: top mastery + last 5 ─ */}
+                        {(topChamp || champLoading || player.recentMatches?.length) && (
+                          <div className="pl-0 sm:pl-[54px] flex items-start gap-3 sm:gap-4 flex-wrap">
 
                           {/* Most played champion card */}
                           {(topChamp || champLoading) && (
@@ -469,6 +450,27 @@ export default function Home() {
                           )}
                         </div>
                       )}
+                      </div>{/* end main content */}
+
+                      {/* ─ Profile links column: spans full card height ─ */}
+                      <div className="shrink-0 flex flex-col justify-between gap-1">
+                        <a href={opggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                          className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#0d1f38] hover:bg-[#12284a] border-[#1a3560]/60 hover:border-[#2d5a9e]/70">
+                          <span className="text-[#4d8bca] group-hover:text-[#7db3e8] text-[11px] font-black tracking-wider transition-colors">OP.GG</span>
+                        </a>
+                        <a href={deeplolUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                          className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#130e24] hover:bg-[#1c1535] border-[#5b21b6]/40 hover:border-[#7c3aed]/60">
+                          <span className="text-[#a78bfa] group-hover:text-[#c4b5fd] text-[11px] font-black tracking-wider transition-colors">DEEPLOL</span>
+                        </a>
+                        <a href={uggUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                          className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#071c23] hover:bg-[#0c2a35] border-[#0e7490]/40 hover:border-[#0891b2]/60">
+                          <span className="text-[#22d3ee] group-hover:text-[#67e8f9] text-[11px] font-black tracking-wider transition-colors">U.GG</span>
+                        </a>
+                        <a href={dpmUrl(player.gameName, player.tagLine)} target="_blank" rel="noopener noreferrer"
+                          className="group flex items-center justify-center px-2.5 py-1.5 rounded-lg border transition-all duration-200 bg-[#1c1302] hover:bg-[#261a03] border-[#92400e]/40 hover:border-[#d97706]/60">
+                          <span className="text-[#f59e0b] group-hover:text-[#fcd34d] text-[11px] font-black tracking-wider transition-colors">DPM</span>
+                        </a>
+                      </div>
                     </div>
                   )
                 })}
@@ -504,17 +506,11 @@ export default function Home() {
                     <p className="text-emerald-400 text-sm mt-0.5">{groupStats.bestWr.rank?.winrate}%</p>
                   </div>
                 )}
-                {groupStats.topChamp && data && (
+                {groupStats.worstWr && (
                   <div className="bg-[#0c1525] rounded-2xl border border-[#111d30] p-4">
-                    <p className="text-[#334155] text-[11px] font-bold uppercase tracking-widest mb-1">Top Champ</p>
-                    <div className="flex items-center gap-2">
-                      <img src={champUrl(groupStats.topChamp[0], data.ddVersion)} alt={groupStats.topChamp[0]}
-                        width={24} height={24} className="w-6 h-6 rounded-md object-cover"
-                        onError={(e) => { ;(e.target as HTMLImageElement).style.opacity = '0.2' }}
-                      />
-                      <p className="text-white text-sm font-bold truncate">{groupStats.topChamp[0]}</p>
-                    </div>
-                    <p className="text-[#283548] text-xs mt-0.5">{groupStats.topChamp[1]} partidas</p>
+                    <p className="text-[#334155] text-[11px] font-bold uppercase tracking-widest mb-1">Peor WR</p>
+                    <p className="text-white text-base font-bold truncate">{groupStats.worstWr.gameName}</p>
+                    <p className="text-red-400 text-sm mt-0.5">{groupStats.worstWr.rank?.winrate}%</p>
                   </div>
                 )}
               </div>
